@@ -51,7 +51,8 @@ jobs:
             echo "default_platform(:ios)" > fastlane/Fastfile
             echo "platform :ios do" >> fastlane/Fastfile
             echo "  lane :release do" >> fastlane/Fastfile
-            echo "    build_app(workspace: 'AutoInvent.xcworkspace', scheme: 'AutoInvent')" >> fastlane/Fastfile
+            echo "    update_code_signing_settings(use_automatic_signing: true, path: 'AutoInvent.xcodeproj', team_id: '7595Z89LDG')" >> fastlane/Fastfile
+            echo "    build_app(workspace: 'AutoInvent.xcworkspace', scheme: 'autoinvent')" >> fastlane/Fastfile
             echo "    upload_to_app_store(" >> fastlane/Fastfile
             echo "      force: true," >> fastlane/Fastfile
             echo "      skip_waiting_for_build_processing: true," >> fastlane/Fastfile
@@ -69,6 +70,8 @@ jobs:
             # Create Appfile
             echo "app_identifier 'com.autoinvent.app'" > fastlane/Appfile
             echo "apple_id 'ignored@example.com'" >> fastlane/Appfile
+            echo "itc_team_id '7595Z89LDG'" >> fastlane/Appfile
+            echo "team_id '7595Z89LDG'" >> fastlane/Appfile
             
             fastlane ios release
           fi
