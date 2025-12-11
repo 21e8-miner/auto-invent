@@ -39,44 +39,36 @@ jobs:
           APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_API_KEY_CONTENT }}
         run: |
           cd ios
-          
-          # Initialize Fastlane
           mkdir -p fastlane
           
           if [ -z "$APP_STORE_CONNECT_API_KEY_ID" ]; then
-            echo "⚠️ No Signing Keys found. Running Unsigned Build (Dry Run)."
+            echo "⚠️ No Signing Keys found. Running Unsigned Build."
             xcodebuild archive -workspace AutoInvent.xcworkspace -scheme AutoInvent -destination "generic/platform=iOS" -archivePath AutoInvent.xcarchive CODE_SIGNING_ALLOWED=NO
           else
             echo "✅ Signing Keys found! Configuring Fastlane..."
             
-            # Create dynamic Fastfile
-            cat > fastlane/Fastfile <<EOF
-            default_platform(:ios)
-            platform :ios do
-              desc "Auto-Invent Cloud Build"
-              lane :release do
-                build_app(workspace: "AutoInvent.xcworkspace", scheme: "AutoInvent")
-                upload_to_app_store(
-                  force: true,
-                  skip_waiting_for_build_processing: true,
-                  app_identifier: "com.autoinvent.app",
-                  api_key: {
-                    key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
-                    issuer_id: ENV["APP_STORE_CONNECT_ISSUER_ID"],
-                    key_content: ENV["APP_STORE_CONNECT_API_KEY_CONTENT"],
-                    is_key_content_base64: false
-                  }
-                )
-              end
-            end
-            EOF
+            # Create Fastfile (Using simple echo to avoid HEREDOC issues in YAML)
+            echo "default_platform(:ios)" > fastlane/Fastfile
+            echo "platform :ios do" >> fastlane/Fastfile
+            echo "  lane :release do" >> fastlane/Fastfile
+            echo "    build_app(workspace: 'AutoInvent.xcworkspace', scheme: 'AutoInvent')" >> fastlane/Fastfile
+            echo "    upload_to_app_store(" >> fastlane/Fastfile
+            echo "      force: true," >> fastlane/Fastfile
+            echo "      skip_waiting_for_build_processing: true," >> fastlane/Fastfile
+            echo "      app_identifier: 'com.autoinvent.app'," >> fastlane/Fastfile
+            echo "      api_key: {" >> fastlane/Fastfile
+            echo "        key_id: ENV['APP_STORE_CONNECT_API_KEY_ID']," >> fastlane/Fastfile
+            echo "        issuer_id: ENV['APP_STORE_CONNECT_ISSUER_ID']," >> fastlane/Fastfile
+            echo "        key_content: ENV['APP_STORE_CONNECT_API_KEY_CONTENT']," >> fastlane/Fastfile
+            echo "        is_key_content_base64: false" >> fastlane/Fastfile
+            echo "      }" >> fastlane/Fastfile
+            echo "    )" >> fastlane/Fastfile
+            echo "  end" >> fastlane/Fastfile
+            echo "end" >> fastlane/Fastfile
 
-            # Create dynamic Appfile
-            cat > fastlane/Appfile <<EOF
-            app_identifier "com.autoinvent.app"
-            apple_id "your-apple-id@example.com" # Not strictly used with API Key auth but Fastlane complains sometimes
-            itc_team_id "YOUR_TEAM_ID" # Optional
-            EOF
+            # Create Appfile
+            echo "app_identifier 'com.autoinvent.app'" > fastlane/Appfile
+            echo "apple_id 'ignored@example.com'" >> fastlane/Appfile
             
             fastlane ios release
           fi
