@@ -1,68 +1,72 @@
 import axios from 'axios';
-import { OPENAI_API_KEY } from '../constants/secrets';
+import { OPENAI_API_KEY } from '../constants/secrets'; // We will reuse this var for HF Token to keep secrets.js simple
+import { cleanJSON } from '../utils/jsonHelper';
 
-const API_URL = 'https://api.openai.com/v1/chat/completions';
+// Using Mistral 7B Instruct v0.3 via Hugging Face Inference API
+const MODEL_ID = "mistralai/Mistral-7B-Instruct-v0.3";
+const API_URL = `https://api-inference.huggingface.co/models/${MODEL_ID}`;
 
 const SYSTEM_PROMPT = `
-You are an expert Senior Product Design Engineer and Patent Strategy Consultant.
-Your goal is to analyze a product description or image prompt and output a structured "Innovation Report".
-Focus on:
-1. Identifying hidden constraints and functions.
-2. Predicting likely failure modes (mechanical, electrical, UX).
-3. Proposing concrete, actionable improvements.
-4. Suggesting cost optimization (manufacturing methods).
-5. Heuristic patentability (what makes this novel).
-6. Visual concept variants for redesign.
+You are an expert Production Engineer. Analyze the user's product description.
+You MUST reply with VALID JSON only. Do not add markdown blocks. Do not explain.
 
-Return ONLY valid JSON with this structure:
+Required JSON Structure:
 {
   "summary": {
-    "title": "Short Project Title",
-    "highlights": ["Key insight 1", "Key insight 2", "Key insight 3"]
+    "title": "Short Title",
+    "highlights": ["Insight 1", "Insight 2", "Insight 3"]
   },
   "functions": [
-    { "name": "Function Name", "type": "Primary" | "Secondary" | "Hidden Constraint" }
+    { "name": "Function Name", "type": "Primary" }
   ],
   "failures": [
-    { "part": "Part Name", "risk": "High" | "Medium" | "Low", "note": "Why it fails" }
+    { "part": "Part Name", "risk": "High", "note": "Reason" }
   ],
   "improvements": [
-    { "title": "Improvement Title", "impact": "High" | "Medium", "difficulty": "Easy" | "Medium" | "Hard", "cost": "+" | "-" | "=" }
+    { "title": "Idea", "impact": "High", "difficulty": "Hard", "cost": "+" }
   ],
   "concepts": [
-    { "name": "Variant Name", "desc": "Visual description for DALL-E prompt" }
+    { "name": "Concept Name", "desc": "Visual description" }
   ]
 }
 `;
 
 export const analyzeProduct = async (description, photoBase64 = null) => {
-    try {
-        const messages = [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: `Product Description: ${description}` }
-        ];
+  try {
+    const prompt = `[INST] ${SYSTEM_PROMPT}\n\nProduct Description: ${description} [/INST]`;
 
-        // TODO: If photoBase64 exists, add image support for GPT-4-Vision here
+    console.log("🧠 Sending request to Hugging Face (" + MODEL_ID + ")...");
 
-        console.log("🧠 Sending request to OpenAI...");
-        const response = await axios.post(API_URL, {
-            model: "gpt-4o",
-            messages: messages,
-            response_format: { type: "json_object" }, // Force JSON
-            temperature: 0.7,
-        }, {
-            headers: {
-                'Authorization': `Bearer ${OPENAI_API_KEY}`,
-                'Content-Type': 'application/json'
-            }
-        });
+    // Note: HF Inference API is rate limited. 
+    const response = await axios.post(API_URL, {
+      inputs: prompt,
+      parameters: {
+        max_new_tokens: 1500,
+        return_full_text: false,
+        temperature: 0.7,
+      }
+    }, {
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`, // Using the variable from secrets.js (User should paste HF token here)
+        'Content-Type': 'application/json'
+      }
+    });
 
-        const result = response.data.choices[0].message.content;
-        const parsed = JSON.parse(result);
-        return parsed;
+    let resultText = response.data[0].generated_text;
+    console.log("Raw AI Response:", resultText.substring(0, 100) + "...");
 
-    } catch (error) {
-        console.error("AI Error:", error.response?.data || error.message);
-        throw error;
+    // Clean and Parse
+    const jsonStr = cleanJSON(resultText);
+    const parsed = JSON.parse(jsonStr);
+
+    return parsed;
+
+  } catch (error) {
+    console.error("AI Error:", error.response?.data || error.message);
+    // If parsing failed (common with local LLMs), throw specific error
+    if (error instanceof SyntaxError) {
+      console.error("Failed to parse JSON from AI");
     }
+    throw error;
+  }
 };
